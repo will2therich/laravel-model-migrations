@@ -1,0 +1,22 @@
+{
+    "name": "will2therich/laravel-model-migrations",
+    "description": "Declare database migrations and factory definitions inside Laravel models.",
+    "keywords": ["php", "laravel", "database", "migrations", "factory", "definitions", "models", "eloquent"],
+    "license": "MIT",
+    "require": {
+        "doctrine/dbal": "^2.0|^3.0|^4.0",
+        "laravel/framework": "^7.0|^8.0|^9.0|^10.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "will2therich\\LaravelModelMigrations\\": "src"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "will2therich\\LaravelModelMigrations\\Providers\\ServiceProvider"
+            ]
+        }
+    }
+}
