@@ -2,11 +2,13 @@
 
 namespace will2therich\LaravelModelMigrations\Commands;
 
-use Doctrine\DBAL\Schema\Comparator;
+use Doctrine\DBAL\DriverManager;
 use Illuminate\Console\Command;
 use Illuminate\Console\ConfirmableTrait;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Symfony\Component\Finder\Finder;
@@ -63,27 +65,58 @@ class MigrateCommand extends Command
         $modelTable = $model->getTable();
         $tempTable = 'table_' . $modelTable;
 
-        Schema::dropIfExists($tempTable);
+        $schema = Schema::connection(null);
 
-        Schema::create($tempTable, function (Blueprint $table) use ($model) {
+        $schema->dropIfExists($tempTable);
+
+        $schema->create($tempTable, function (Blueprint $table) use ($model) {
             $model->migration($table);
         });
 
-        if (Schema::hasTable($modelTable)) {
-            $manager = $model->getConnection()->getDoctrineSchemaManager();
-            $diff = (new Comparator)->diffTable($manager->listTableDetails($modelTable), $manager->listTableDetails($tempTable));
+        if ($schema->hasTable($modelTable)) {
+            $doctrineConnection = $this->createDoctrineConnection();
+            $schemaManager = $doctrineConnection->createSchemaManager();
 
-            if ($diff) {
-                $manager->alterTable($diff);
+            // Compare our temp and existing tbale
+            $comparator = $schemaManager->createComparator();
+            $diff = $comparator->compareTables(
+                $schemaManager->introspectTable($modelTable),
+                $schemaManager->introspectTable($tempTable)
+            );
+
+            // Generate our SQL statements to bring model table upto date
+            $sqlStatements = $doctrineConnection->getDatabasePlatform()->getAlterTableSQL($diff);
+
+            // If we have changes to make lets make them
+            if (!empty($sqlStatements)) {
+                foreach ($sqlStatements as $statement) {
+                    $doctrineConnection->executeStatement($statement);
+                }
 
                 $this->line('<info>Table updated:</info> ' . $modelTable);
             }
 
-            Schema::drop($tempTable);
+            $schema->drop($tempTable);
         } else {
-            Schema::rename($tempTable, $modelTable);
+            $schema->rename($tempTable, $modelTable);
 
             $this->line('<info>Table created:</info> ' . $modelTable);
         }
+    }
+
+    private function createDoctrineConnection()
+    {
+        $connection = Schema::connection(null)->getConnection();
+        $config = $connection->getConfig();
+
+        return DriverManager::getConnection([
+            'dbname' => $config['database'],
+            'user' => $config['username'],
+            'password' => $config['password'],
+            'host' => $config['host'],
+            'driver' => 'pdo_' . $config['driver'], // Adjust the driver as needed
+        ]);
+
+
     }
 }
