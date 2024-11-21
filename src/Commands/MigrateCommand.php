@@ -65,7 +65,7 @@ class MigrateCommand extends Command
         $modelTable = $model->getTable();
         $tempTable = 'table_' . $modelTable;
 
-        $schema = Schema::connection(null);
+        $schema = Schema::connection($model->getConnectionName());
 
         $schema->dropIfExists($tempTable);
 
