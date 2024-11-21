@@ -4,8 +4,8 @@
     "keywords": ["php", "laravel", "database", "migrations", "factory", "definitions", "models", "eloquent"],
     "license": "MIT",
     "require": {
-        "doctrine/dbal": "^2.0|^3.0|^4.0",
-        "laravel/framework": "^7.0|^8.0|^9.0|^10.0"
+        "doctrine/dbal": "^4.0",
+        "laravel/framework": "^11.0"
     },
     "autoload": {
         "psr-4": {
