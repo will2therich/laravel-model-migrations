@@ -62,45 +62,49 @@ class MigrateCommand extends Command
 
     protected function migrateModel(Model $model)
     {
-        $modelTable = $model->getTable();
-        $tempTable = 'table_' . $modelTable;
+        try {
+            $modelTable = $model->getTable();
+            $tempTable = 'table_' . $modelTable;
 
-        $schema = Schema::connection($model->getConnectionName());
+            $schema = Schema::connection($model->getConnectionName());
 
-        $schema->dropIfExists($tempTable);
+            $schema->dropIfExists($tempTable);
 
-        $schema->create($tempTable, function (Blueprint $table) use ($model) {
-            $model->migration($table);
-        });
+            $schema->create($tempTable, function (Blueprint $table) use ($model) {
+                $model->migration($table);
+            });
 
-        if ($schema->hasTable($modelTable)) {
-            $doctrineConnection = $this->createDoctrineConnection();
-            $schemaManager = $doctrineConnection->createSchemaManager();
+            if ($schema->hasTable($modelTable)) {
+                $doctrineConnection = $this->createDoctrineConnection();
+                $schemaManager = $doctrineConnection->createSchemaManager();
 
-            // Compare our temp and existing tbale
-            $comparator = $schemaManager->createComparator();
-            $diff = $comparator->compareTables(
-                $schemaManager->introspectTable($modelTable),
-                $schemaManager->introspectTable($tempTable)
-            );
+                // Compare our temp and existing tbale
+                $comparator = $schemaManager->createComparator();
+                $diff = $comparator->compareTables(
+                    $schemaManager->introspectTable($modelTable),
+                    $schemaManager->introspectTable($tempTable)
+                );
 
-            // Generate our SQL statements to bring model table upto date
-            $sqlStatements = $doctrineConnection->getDatabasePlatform()->getAlterTableSQL($diff);
+                // Generate our SQL statements to bring model table upto date
+                $sqlStatements = $doctrineConnection->getDatabasePlatform()->getAlterTableSQL($diff);
 
-            // If we have changes to make lets make them
-            if (!empty($sqlStatements)) {
-                foreach ($sqlStatements as $statement) {
-                    $doctrineConnection->executeStatement($statement);
+                // If we have changes to make lets make them
+                if (!empty($sqlStatements)) {
+                    foreach ($sqlStatements as $statement) {
+                        $doctrineConnection->executeStatement($statement);
+                    }
+
+                    $this->line('<info>Table updated:</info> ' . $modelTable);
                 }
 
-                $this->line('<info>Table updated:</info> ' . $modelTable);
+                $schema->drop($tempTable);
+            } else {
+                $schema->rename($tempTable, $modelTable);
+
+                $this->line('<info>Table created:</info> ' . $modelTable);
             }
-
-            $schema->drop($tempTable);
-        } else {
-            $schema->rename($tempTable, $modelTable);
-
-            $this->line('<info>Table created:</info> ' . $modelTable);
+        } catch (\Exception $e) {
+            $this->line('<error>Error migrating table:</error> ' . $model->getTable());
         }
     }
 
